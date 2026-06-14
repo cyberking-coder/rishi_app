@@ -27,6 +27,24 @@ Health check: `GET http://localhost:4000/api/health`
 | GET    | `/api/media/:id`           | yes  | single item |
 | GET    | `/api/media/:id/stream`    | yes  | range-enabled streaming for playback |
 | GET    | `/api/media/:id/download`  | yes  | raw bytes for the app to encrypt + store in-sandbox |
+| GET    | `/api/admin/media`         | admin | full catalog incl. unpublished |
+| POST   | `/api/admin/media`         | admin | multipart upload: `title`, `mediaType`, `file` (+ optional `thumbnail`, `description`, `isDownloadable`, `durationSecs`) |
+| PATCH  | `/api/admin/media/:id`     | admin | edit `title`/`description`/`isPublished`/`isDownloadable`/`durationSecs` |
+| DELETE | `/api/admin/media/:id`     | admin | remove the row and its file |
+
+### Admin web console
+
+A no-build admin page is served at **`http://localhost:4000/admin/`**. Sign in with an admin
+account (see `npm run seed`) to upload media, toggle publish state, and delete items.
+
+> **Admins are exempt from the single-device lock** — they manage the catalog from a browser
+> and must not be bound to one device. The lock applies to `role = 'user'` accounts only.
+
+### Media & thumbnail storage
+
+- Uploaded **media files** are stored in `MEDIA_DIR` with a random UUID filename and served
+  only through the auth-checked stream/download endpoints (never statically).
+- **Thumbnails** are stored in `MEDIA_DIR/thumbnails` and served publicly at `/thumbnails/...`.
 
 ### Device-lock behaviour
 

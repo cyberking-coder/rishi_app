@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Anurag_Rishi — Admin</title>
+  <style>
+    :root { color-scheme: light dark; }
+    * { box-sizing: border-box; }
+    body { font-family: system-ui, sans-serif; max-width: 880px; margin: 0 auto; padding: 24px; }
+    h1 { margin-bottom: 4px; }
+    .muted { color: #888; font-size: 14px; }
+    .card { border: 1px solid #8884; border-radius: 10px; padding: 16px; margin: 16px 0; }
+    label { display: block; font-size: 13px; margin: 10px 0 4px; }
+    input, textarea, select, button { font: inherit; padding: 8px; width: 100%; border-radius: 6px; border: 1px solid #8886; }
+    button { cursor: pointer; width: auto; padding: 8px 16px; }
+    .row { display: flex; gap: 12px; flex-wrap: wrap; }
+    .row > * { flex: 1; min-width: 160px; }
+    table { width: 100%; border-collapse: collapse; margin-top: 8px; }
+    th, td { text-align: left; padding: 8px; border-bottom: 1px solid #8883; font-size: 14px; }
+    .hidden { display: none; }
+    .err { color: #c0392b; }
+    .ok { color: #27ae60; }
+    .pill { font-size: 12px; padding: 2px 8px; border-radius: 999px; background: #8882; }
+  </style>
+</head>
+<body>
+  <h1>Anurag_Rishi — Admin</h1>
+  <p class="muted">Upload and manage videos &amp; audio.</p>
+
+  <!-- Login -->
+  <div id="loginCard" class="card">
+    <h3>Sign in (admin)</h3>
+    <label>Email</label>
+    <input id="email" type="email" autocomplete="username" />
+    <label>Password</label>
+    <input id="password" type="password" autocomplete="current-password" />
+    <p><button id="loginBtn">Sign in</button> <span id="loginMsg"></span></p>
+  </div>
+
+  <!-- Authenticated area -->
+  <div id="app" class="hidden">
+    <p>
+      Signed in as <strong id="who"></strong>
+      <button id="logoutBtn" style="float:right">Sign out</button>
+    </p>
+
+    <div class="card">
+      <h3>Upload media</h3>
+      <label>Title</label>
+      <input id="title" />
+      <label>Description</label>
+      <textarea id="description" rows="2"></textarea>
+      <div class="row">
+        <div>
+          <label>Type</label>
+          <select id="mediaType">
+            <option value="video">Video</option>
+            <option value="audio">Audio</option>
+          </select>
+        </div>
+        <div>
+          <label>Downloadable?</label>
+          <select id="isDownloadable">
+            <option value="true">Yes</option>
+            <option value="false">No</option>
+          </select>
+        </div>
+      </div>
+      <label>Media file (mp4 / mp3 / …)</label>
+      <input id="file" type="file" />
+      <label>Thumbnail (optional image)</label>
+      <input id="thumbnail" type="file" accept="image/*" />
+      <p><button id="uploadBtn">Upload</button> <span id="uploadMsg"></span></p>
+      <progress id="prog" class="hidden" value="0" max="100" style="width:100%"></progress>
+    </div>
+
+    <div class="card">
+      <h3>Catalog</h3>
+      <table>
+        <thead>
+          <tr><th>ID</th><th>Title</th><th>Type</th><th>Published</th><th></th></tr>
+        </thead>
+        <tbody id="rows"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <script>
+    const API = '/api';
+    let token = localStorage.getItem('admin_token') || null;
+
+    // The login endpoint requires a device id; admins are exempt from the lock,
+    // but we still send a stable browser id for the audit trail.
+    function browserDeviceId() {
+      let id = localStorage.getItem('admin_device_id');
+      if (!id) { id = 'web-' + crypto.randomUUID(); localStorage.setItem('admin_device_id', id); }
+      return id;
+    }
+
+    const $ = (id) => document.getElementById(id);
+
+    async function api(path, { method = 'GET', body, headers = {} } = {}) {
+      const res = await fetch(API + path, {
+        method,
+        headers: { ...(token ? { Authorization: 'Bearer ' + token } : {}), ...headers },
+        body,
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.error?.message || ('Request failed (' + res.status + ')'));
+      return data;
+    }
+
+    async function login() {
+      $('loginMsg').textContent = '';
+      try {
+        const data = await api('/auth/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            email: $('email').value.trim(),
+            password: $('password').value,
+            device: { id: browserDeviceId(), platform: 'web', model: 'admin-console' },
+          }),
+        });
+        if (data.user.role !== 'admin') throw new Error('This account is not an admin.');
+        token = data.token;
+        localStorage.setItem('admin_token', token);
+        showApp(data.user);
+      } catch (e) {
+        $('loginMsg').innerHTML = '<span class="err">' + e.message + '</span>';
+      }
+    }
+
+    function showApp(user) {
+      $('loginCard').classList.add('hidden');
+      $('app').classList.remove('hidden');
+      $('who').textContent = user.displayName + ' (' + user.email + ')';
+      loadCatalog();
+    }
+
+    function logout() {
+      token = null;
+      localStorage.removeItem('admin_token');
+      location.reload();
+    }
+
+    async function loadCatalog() {
+      const { items } = await api('/admin/media');
+      $('rows').innerHTML = items.map((m) => `
+        <tr>
+          <td>${m.id}</td>
+          <td>${escapeHtml(m.title)}</td>
+          <td><span class="pill">${m.mediaType}</span></td>
+          <td>${m.isPublished ? 'Yes' : 'No'}</td>
+          <td>
+            <button data-toggle="${m.id}" data-pub="${m.isPublished}">${m.isPublished ? 'Unpublish' : 'Publish'}</button>
+            <button data-del="${m.id}">Delete</button>
+          </td>
+        </tr>`).join('');
+
+      document.querySelectorAll('[data-toggle]').forEach((b) =>
+        b.onclick = () => togglePublish(b.dataset.toggle, b.dataset.pub === 'true'));
+      document.querySelectorAll('[data-del]').forEach((b) =>
+        b.onclick = () => removeMedia(b.dataset.del));
+    }
+
+    async function togglePublish(id, isPublished) {
+      await api('/admin/media/' + id, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ isPublished: !isPublished }),
+      });
+      loadCatalog();
+    }
+
+    async function removeMedia(id) {
+      if (!confirm('Delete media #' + id + '? This removes the file too.')) return;
+      await api('/admin/media/' + id, { method: 'DELETE' });
+      loadCatalog();
+    }
+
+    function upload() {
+      const file = $('file').files[0];
+      if (!file) { $('uploadMsg').innerHTML = '<span class="err">Choose a media file.</span>'; return; }
+      const fd = new FormData();
+      fd.append('title', $('title').value.trim());
+      fd.append('description', $('description').value);
+      fd.append('mediaType', $('mediaType').value);
+      fd.append('isDownloadable', $('isDownloadable').value);
+      fd.append('file', file);
+      if ($('thumbnail').files[0]) fd.append('thumbnail', $('thumbnail').files[0]);
+
+      // XHR for upload progress.
+      const xhr = new XMLHttpRequest();
+      xhr.open('POST', API + '/admin/media');
+      xhr.setRequestHeader('Authorization', 'Bearer ' + token);
+      $('prog').classList.remove('hidden');
+      xhr.upload.onprogress = (e) => { if (e.lengthComputable) $('prog').value = (e.loaded / e.total) * 100; };
+      xhr.onload = () => {
+        $('prog').classList.add('hidden');
+        if (xhr.status >= 200 && xhr.status < 300) {
+          $('uploadMsg').innerHTML = '<span class="ok">Uploaded.</span>';
+          $('title').value = ''; $('description').value = ''; $('file').value = ''; $('thumbnail').value = '';
+          loadCatalog();
+        } else {
+          let msg = 'Upload failed (' + xhr.status + ')';
+          try { msg = JSON.parse(xhr.responseText).error.message; } catch (_) {}
+          $('uploadMsg').innerHTML = '<span class="err">' + msg + '</span>';
+        }
+      };
+      xhr.onerror = () => { $('prog').classList.add('hidden'); $('uploadMsg').innerHTML = '<span class="err">Network error.</span>'; };
+      xhr.send(fd);
+    }
+
+    function escapeHtml(s) {
+      return String(s).replace(/[&<>"']/g, (c) =>
+        ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+    }
+
+    $('loginBtn').onclick = login;
+    $('logoutBtn').onclick = logout;
+    $('uploadBtn').onclick = upload;
+
+    // Auto-resume a saved session.
+    if (token) {
+      api('/auth/me').then((d) => showApp(d.user)).catch(() => logout());
+    }
+  </script>
+</body>
+</html>

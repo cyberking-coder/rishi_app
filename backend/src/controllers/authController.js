@@ -105,7 +105,11 @@ async function login(req, res) {
     }
 
     // ---- Device-lock enforcement ----
-    if (!user.bound_device_id) {
+    // Admins are exempt: they manage the catalog from a browser/desktop and must
+    // not get bound to a single device. The lock applies to content consumers only.
+    if (user.role === 'admin') {
+      // no binding, no enforcement
+    } else if (!user.bound_device_id) {
       // First ever successful login → bind the account to this device.
       await conn.query(
         'UPDATE users SET bound_device_id = :did WHERE id = :id',

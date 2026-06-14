@@ -1,10 +1,12 @@
 'use strict';
 
+const path = require('path');
 const express = require('express');
 const cors = require('cors');
 const env = require('./config/env');
 const authRoutes = require('./routes/auth');
 const mediaRoutes = require('./routes/media');
+const adminRoutes = require('./routes/admin');
 
 const app = express();
 
@@ -17,6 +19,13 @@ app.get('/api/health', (req, res) => res.json({ ok: true, service: 'anurag-rishi
 
 app.use('/api/auth', authRoutes);
 app.use('/api/media', mediaRoutes);
+app.use('/api/admin', adminRoutes);
+
+// Public thumbnails (images only — the actual media files are never served statically).
+app.use('/thumbnails', express.static(path.join(path.resolve(env.mediaDir), 'thumbnails')));
+
+// Minimal admin web page for uploading/managing the catalog.
+app.use('/admin', express.static(path.join(__dirname, '..', 'public', 'admin')));
 
 // 404
 app.use((req, res) => {

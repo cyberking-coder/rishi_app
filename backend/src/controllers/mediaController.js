@@ -2,9 +2,9 @@
 
 const fs = require('fs');
 const path = require('path');
-const env = require('../config/env');
 const { pool } = require('../config/db');
 const { ApiError } = require('../utils/http');
+const { resolveMediaPath } = require('../utils/mediaPath');
 
 function publicMedia(row) {
   return {
@@ -16,16 +16,6 @@ function publicMedia(row) {
     durationSecs: row.duration_secs,
     isDownloadable: !!row.is_downloadable,
   };
-}
-
-// Resolve a media row's file path safely inside MEDIA_DIR (prevents path traversal).
-function resolveMediaPath(fileKey) {
-  const base = path.resolve(env.mediaDir);
-  const full = path.resolve(base, fileKey);
-  if (full !== base && !full.startsWith(base + path.sep)) {
-    throw new ApiError(400, 'Invalid media path', 'bad_path');
-  }
-  return full;
 }
 
 async function loadMediaOrThrow(id) {
