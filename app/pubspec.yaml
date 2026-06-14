@@ -1,0 +1,41 @@
+name: anurag_rishi
+description: Anurag_Rishi — secure videos & audio with single-device login.
+publish_to: "none"
+version: 0.1.0+1
+
+environment:
+  sdk: ">=3.3.0 <4.0.0"
+  flutter: ">=3.19.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  cupertino_icons: ^1.0.6
+
+  # Networking
+  http: ^1.2.0
+
+  # State management
+  provider: ^6.1.2
+
+  # Device fingerprint + secure key storage (Android Keystore / iOS Keychain)
+  flutter_secure_storage: ^9.2.2
+  device_info_plus: ^10.1.0
+  uuid: ^4.4.0
+
+  # Secure in-app downloads (encrypt before writing to the private sandbox)
+  encrypt: ^5.0.3
+  path_provider: ^2.1.3
+  crypto: ^3.0.3
+
+  # Playback
+  video_player: ^2.9.1
+  just_audio: ^0.9.40
+
+dev_dependencies:
+  flutter_lints: ^4.0.0
+  flutter_test:
+    sdk: flutter
+
+flutter:
+  uses-material-design: true
